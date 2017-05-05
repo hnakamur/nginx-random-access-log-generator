@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math"
 	"math/rand"
 	"time"
 
@@ -51,6 +52,25 @@ func randHost(intner randutil.Intner, siteCount int) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%d.example.jp", siteIndex), nil
+}
+
+func randBytesSent(intner randutil.Intner, bytesSentMax int) (int, error) {
+	// https://www.wolframalpha.com/input/?i=y+%3D+(4%5E(x%2F1000)+%2F+(x%2F1000)!)+exp(-4)
+	// https://www.wolframalpha.com/input/?i=y+%3D+4%5E(x%2F1000)+%2F+(x%2F1000)!
+	v, err := intner.Intn(12000)
+	if err != nil {
+		return 0, err
+	}
+	x := float64(v) / 800
+	lambda := float64(4)
+	y := math.Pow(lambda, x) / float64(factorialMemoization(uint64(x)))
+	bytesSent := int(y / 12 * float64(bytesSentMax))
+	if bytesSent < 0 {
+		bytesSent = 0
+	} else if bytesSentMax < bytesSent {
+		bytesSent = bytesSentMax
+	}
+	return bytesSent, nil
 }
 
 func main() {
@@ -110,7 +130,11 @@ func main() {
 		if err != nil {
 			logger.Error("", zap.Error(err))
 		}
-		bytesSent := normRand(0, bytesSentMax, bytesSentMean, bytesSentStdDev)
+		//bytesSent := normRand(0, bytesSentMax, bytesSentMean, bytesSentStdDev)
+		bytesSent, err := randBytesSent(intner, bytesSentMax)
+		if err != nil {
+			logger.Error("", zap.Error(err))
+		}
 		logger.Info("",
 			zap.String("host", host),
 			zap.String("http_host", host),
@@ -120,4 +144,21 @@ func main() {
 			zap.String("sent_http_x_cache", cache.(string)),
 		)
 	}
+}
+
+// https://gist.github.com/esimov/9622710
+var facts [120]uint64
+
+func factorialMemoization(n uint64) (res uint64) {
+	if facts[n] != 0 {
+		res = facts[n]
+		return res
+	}
+
+	if n > 0 {
+		res = n * factorialMemoization(n-1)
+		return res
+	}
+
+	return 1
 }
