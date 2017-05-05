@@ -124,20 +124,3 @@ func main() {
 		)
 	}
 }
-
-// https://gist.github.com/esimov/9622710
-var facts [120]uint64
-
-func factorialMemoization(n uint64) (res uint64) {
-	if facts[n] != 0 {
-		res = facts[n]
-		return res
-	}
-
-	if n > 0 {
-		res = n * factorialMemoization(n-1)
-		return res
-	}
-
-	return 1
-}
