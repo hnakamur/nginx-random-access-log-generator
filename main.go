@@ -3,12 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"math"
+	"os"
 	"time"
 
 	"github.com/hnakamur/randutil"
-	ltsv "github.com/hnakamur/zap-ltsv"
-	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -70,35 +70,24 @@ func main() {
 	flag.DurationVar(&duration, "duration", 10*time.Second, "run duration")
 	flag.Parse()
 
-	err := ltsv.RegisterLTSVEncoder()
+	file, err := os.OpenFile(logFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to open log file, err=%+v", err)
 	}
-
-	cfg := ltsv.NewProductionConfig()
-	cfg.EncoderConfig.MessageKey = ""
-	cfg.EncoderConfig.LevelKey = ""
-	cfg.EncoderConfig.CallerKey = ""
-	cfg.EncoderConfig.EncodeTime = ISO8601NoNanoTimeEncoder
-	cfg.Sampling = nil
-	cfg.OutputPaths = []string{logFile}
-	logger, err := cfg.Build()
-	if err != nil {
-		panic(err)
-	}
+	defer file.Close()
 
 	intner := randutil.NewMathIntner(time.Now().UnixNano())
 	statusChooser, err := randutil.NewChooser(intner, statusChoices)
 	if err != nil {
-		logger.Fatal("", zap.Error(err))
+		log.Fatalf("failed to create chooser for status, err=%+v", err)
 	}
 	schemeChooser, err := randutil.NewChooser(intner, schemeChoices)
 	if err != nil {
-		logger.Fatal("", zap.Error(err))
+		log.Fatalf("failed to create chooser for scheme, err=%+v", err)
 	}
 	cacheChooser, err := randutil.NewChooser(intner, cacheChoices)
 	if err != nil {
-		logger.Fatal("", zap.Error(err))
+		log.Fatalf("failed to create chooser for cache, err=%+v", err)
 	}
 
 	var elapsedForRandom time.Duration
@@ -109,35 +98,28 @@ func main() {
 	for t.Before(due) {
 		scheme, err := schemeChooser.Choose()
 		if err != nil {
-			logger.Error("", zap.Error(err))
+			log.Printf("failed to choose scheme, err=%+v", err)
 		}
 		status, err := statusChooser.Choose()
 		if err != nil {
-			logger.Error("", zap.Error(err))
+			log.Printf("failed to choose status, err=%+v", err)
 		}
 		cache, err := cacheChooser.Choose()
 		if err != nil {
-			logger.Error("", zap.Error(err))
+			log.Printf("failed to choose cache hit status, err=%+v", err)
 		}
 		host, err := randHost(intner, siteCount)
 		if err != nil {
-			logger.Error("", zap.Error(err))
+			log.Printf("failed to generate random host, err=%+v", err)
 		}
 		bytesSent, err := randBytesSent(intner, bytesSentMax)
 		if err != nil {
-			logger.Error("", zap.Error(err))
+			log.Printf("failed to generate random bytesSent, err=%+v", err)
 		}
 		t2 := time.Now()
 		elapsedForRandom += t2.Sub(t)
 
-		logger.Info("",
-			zap.String("host", host),
-			zap.String("http_host", host),
-			zap.String("scheme", scheme.(string)),
-			zap.Int("status", status.(int)),
-			zap.Int("bytes_sent", bytesSent),
-			zap.String("sent_http_x_cache", cache.(string)),
-		)
+		file.WriteString(fmt.Sprintf("time:%s\thost:%s\thttp_host:%s\tscheme:%s\tstatus:%d\tbytes_sent:%d\tsent_http_x_cache:%s\n", t2.Format("2006-01-02T15:04:05Z0700"), host, host, scheme.(string), status.(int), bytesSent, cache.(string)))
 		t = time.Now()
 		elapsedForLog += t.Sub(t2)
 		lineCount++
