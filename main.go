@@ -64,6 +64,8 @@ func main() {
 	flag.IntVar(&siteCount, "site-count", 1e4, "site count")
 	var logFile string
 	flag.StringVar(&logFile, "log-file", "access.log", "log file path")
+	var tps int
+	flag.IntVar(&tps, "tps", 1000, "access counts per second")
 	flag.Parse()
 
 	err := ltsv.RegisterLTSVEncoder()
@@ -82,7 +84,7 @@ func main() {
 		panic(err)
 	}
 
-	intner := randutil.NewCryptoIntner()
+	intner := randutil.NewMathIntner(time.Now().UnixNano())
 	statusChooser, err := randutil.NewChooser(intner, statusChoices)
 	if err != nil {
 		logger.Fatal("", zap.Error(err))
@@ -96,7 +98,14 @@ func main() {
 		logger.Fatal("", zap.Error(err))
 	}
 
-	for i := 0; i < 100; i++ {
+	// Here I use rate limiting based on
+	// https://github.com/golang/go/wiki/RateLimiting
+	// I don't use goroutine since time for logging are short enough.
+	// rate := time.Second / time.Duration(tps)
+	// throttle := time.Tick(rate)
+	for {
+		//<-throttle
+
 		scheme, err := schemeChooser.Choose()
 		if err != nil {
 			logger.Error("", zap.Error(err))
