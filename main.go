@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"math"
-	"math/rand"
 	"time"
 
 	"github.com/hnakamur/randutil"
@@ -36,16 +35,6 @@ func ISO8601NoNanoTimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	enc.AppendString(t.Format("2006-01-02T15:04:05Z0700"))
 }
 
-func normRand(min, max int, mean, stdDev float64) int {
-	r := int(rand.NormFloat64()*stdDev + mean)
-	if r < min {
-		return min
-	} else if max < r {
-		return max
-	}
-	return r
-}
-
 func randHost(intner randutil.Intner, siteCount int) (string, error) {
 	siteIndex, err := intner.Intn(siteCount)
 	if err != nil {
@@ -55,29 +44,20 @@ func randHost(intner randutil.Intner, siteCount int) (string, error) {
 }
 
 func randBytesSent(intner randutil.Intner, bytesSentMax int) (int, error) {
-	// https://www.wolframalpha.com/input/?i=y+%3D+(4%5E(x%2F1000)+%2F+(x%2F1000)!)+exp(-4)
-	// https://www.wolframalpha.com/input/?i=y+%3D+4%5E(x%2F1000)+%2F+(x%2F1000)!
-	v, err := intner.Intn(12000)
+	// https://www.wolframalpha.com/input/?i=y+%3D+exp(-x)
+	intnMax := int(1e6)
+	v, err := intner.Intn(intnMax)
 	if err != nil {
 		return 0, err
 	}
-	x := float64(v) / 800
-	lambda := float64(4)
-	y := math.Pow(lambda, x) / float64(factorialMemoization(uint64(x)))
-	bytesSent := int(y / 12 * float64(bytesSentMax))
-	if bytesSent < 0 {
-		bytesSent = 0
-	} else if bytesSentMax < bytesSent {
-		bytesSent = bytesSentMax
-	}
+	adjuster := float64(10)
+	x := float64(v) / float64(intnMax) * adjuster
+	y := math.Exp(-x) / math.E
+	bytesSent := int(float64(bytesSentMax) * y)
 	return bytesSent, nil
 }
 
 func main() {
-	var bytesSentMean float64
-	flag.Float64Var(&bytesSentMean, "bytes-sent-mean", 1e5, "bytes_sent_mean")
-	var bytesSentStdDev float64
-	flag.Float64Var(&bytesSentStdDev, "bytes-sent-std-dev", 1e4, "bytes_sent_std_dev")
 	var bytesSentMax int
 	flag.IntVar(&bytesSentMax, "bytes-sent-max", 1e7, "bytes_sent_max")
 	var siteCount int
@@ -130,7 +110,6 @@ func main() {
 		if err != nil {
 			logger.Error("", zap.Error(err))
 		}
-		//bytesSent := normRand(0, bytesSentMax, bytesSentMean, bytesSentStdDev)
 		bytesSent, err := randBytesSent(intner, bytesSentMax)
 		if err != nil {
 			logger.Error("", zap.Error(err))
