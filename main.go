@@ -62,6 +62,8 @@ func main() {
 	flag.IntVar(&bytesSentMax, "bytes-sent-max", 1e7, "bytes_sent_max")
 	var siteCount int
 	flag.IntVar(&siteCount, "site-count", 1e4, "site count")
+	var logFile string
+	flag.StringVar(&logFile, "log-file", "access.log", "log file path")
 	flag.Parse()
 
 	err := ltsv.RegisterLTSVEncoder()
@@ -74,6 +76,7 @@ func main() {
 	cfg.EncoderConfig.LevelKey = ""
 	cfg.EncoderConfig.CallerKey = ""
 	cfg.EncoderConfig.EncodeTime = ISO8601NoNanoTimeEncoder
+	cfg.OutputPaths = []string{logFile}
 	logger, err := cfg.Build()
 	if err != nil {
 		panic(err)
