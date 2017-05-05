@@ -66,6 +66,8 @@ func main() {
 	flag.StringVar(&logFile, "log-file", "access.log", "log file path")
 	var tps int
 	flag.IntVar(&tps, "tps", 1000, "access counts per second")
+	var duration time.Duration
+	flag.DurationVar(&duration, "duration", 10*time.Second, "run duration")
 	flag.Parse()
 
 	err := ltsv.RegisterLTSVEncoder()
@@ -78,6 +80,7 @@ func main() {
 	cfg.EncoderConfig.LevelKey = ""
 	cfg.EncoderConfig.CallerKey = ""
 	cfg.EncoderConfig.EncodeTime = ISO8601NoNanoTimeEncoder
+	cfg.Sampling = nil
 	cfg.OutputPaths = []string{logFile}
 	logger, err := cfg.Build()
 	if err != nil {
@@ -98,14 +101,12 @@ func main() {
 		logger.Fatal("", zap.Error(err))
 	}
 
-	// Here I use rate limiting based on
-	// https://github.com/golang/go/wiki/RateLimiting
-	// I don't use goroutine since time for logging are short enough.
-	// rate := time.Second / time.Duration(tps)
-	// throttle := time.Tick(rate)
-	for {
-		//<-throttle
-
+	var elapsedForRandom time.Duration
+	var elapsedForLog time.Duration
+	var lineCount int
+	due := time.Now().Add(duration)
+	t := time.Now()
+	for t.Before(due) {
 		scheme, err := schemeChooser.Choose()
 		if err != nil {
 			logger.Error("", zap.Error(err))
@@ -126,6 +127,9 @@ func main() {
 		if err != nil {
 			logger.Error("", zap.Error(err))
 		}
+		t2 := time.Now()
+		elapsedForRandom += t2.Sub(t)
+
 		logger.Info("",
 			zap.String("host", host),
 			zap.String("http_host", host),
@@ -134,5 +138,9 @@ func main() {
 			zap.Int("bytes_sent", bytesSent),
 			zap.String("sent_http_x_cache", cache.(string)),
 		)
+		t = time.Now()
+		elapsedForLog += t.Sub(t2)
+		lineCount++
 	}
+	fmt.Printf("lineCount=%d, elapsedForRandom=%s, elapsedForLog=%s\n", lineCount, elapsedForRandom, elapsedForLog)
 }
