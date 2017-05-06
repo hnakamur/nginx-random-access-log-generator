@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/hnakamur/ltsvlog"
 	"github.com/hnakamur/randutil"
 	"go.uber.org/zap/zapcore"
 )
@@ -75,7 +76,7 @@ func main() {
 		log.Fatalf("failed to open log file, err=%+v", err)
 	}
 	defer file.Close()
-	logger := log.New(file, "", 0)
+	ltsvlog.Logger = ltsvlog.NewLTSVLogger(file, false, ltsvlog.SetLevelLabel(""))
 
 	intner := randutil.NewMathIntner(time.Now().UnixNano())
 	statusChooser, err := randutil.NewChooser(intner, statusChoices)
@@ -120,7 +121,14 @@ func main() {
 		t2 := time.Now()
 		elapsedForRandom += t2.Sub(t)
 
-		logger.Printf("time:%s\thost:%s\thttp_host:%s\tscheme:%s\tstatus:%d\tbytes_sent:%d\tsent_http_x_cache:%s\n", time.Now().Format("2006-01-02T15:04:05Z0700"), host, host, scheme.(string), status.(int), bytesSent, cache.(string))
+		ltsvlog.Logger.Info(
+			ltsvlog.LV{"host", host},
+			ltsvlog.LV{"http_host", host},
+			ltsvlog.LV{"scheme", scheme},
+			ltsvlog.LV{"status", status.(int)},
+			ltsvlog.LV{"bytes_sent", bytesSent},
+			ltsvlog.LV{"sent_http_x_cache", cache.(string)},
+		)
 		t = time.Now()
 		elapsedForLog += t.Sub(t2)
 		lineCount++
