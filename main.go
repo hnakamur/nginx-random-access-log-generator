@@ -92,11 +92,9 @@ func main() {
 		log.Fatalf("failed to create chooser for cache, err=%+v", err)
 	}
 
-	var elapsedForRandom time.Duration
-	var elapsedForLog time.Duration
 	var lineCount int
-	due := time.Now().Add(duration)
 	t := time.Now()
+	due := t.Add(duration)
 	for t.Before(due) {
 		scheme, err := schemeChooser.Choose()
 		if err != nil {
@@ -118,8 +116,6 @@ func main() {
 		if err != nil {
 			log.Printf("failed to generate random bytesSent, err=%+v", err)
 		}
-		t2 := time.Now()
-		elapsedForRandom += t2.Sub(t)
 
 		ltsvlog.Logger.Info(
 			ltsvlog.LV{"host", host},
@@ -129,9 +125,8 @@ func main() {
 			ltsvlog.LV{"bytes_sent", bytesSent},
 			ltsvlog.LV{"sent_http_x_cache", cache.(string)},
 		)
-		t = time.Now()
-		elapsedForLog += t.Sub(t2)
 		lineCount++
+		t = time.Now()
 	}
-	fmt.Printf("lineCount=%d, elapsedForRandom=%s, elapsedForLog=%s\n", lineCount, elapsedForRandom, elapsedForLog)
+	fmt.Printf("lineCount=%d\n", lineCount)
 }
